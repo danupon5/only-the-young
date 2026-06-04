@@ -66,6 +66,7 @@
 ## Gemini API Key
 
 - ขอฟรีได้ที่ **[aistudio.google.com/apikey](https://aistudio.google.com/apikey)**
+- หากไม่ผ่าน ให้ https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com
 - เลือก **"Create API key in new project"** (อย่าเลือก project ที่มี Billing)
 - Key เก็บใน `localStorage` ของ browser เท่านั้น ไม่ได้ส่งไปที่อื่น
 
