@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+Thai:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg: #0d0f12; --surface: #151820; --surface2: #1c2030;
+    --border: #2a3040; --accent: #00e5a0; --accent2: #0099ff;
+    --warn: #ffb700; --text: #e8ecf4; --muted: #6b7a99;
+    --gemini: #8b5cf6; --kbank: #1a9e3f;
+    --mono: 'IBM Plex Mono', monospace; --sans: 'IBM Plex Sans Thai', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; padding: 20px 18px 80px; }
+
+  .header { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; border-bottom: 1px solid var(--border); padding-bottom: 18px; }
+  .logo { width: 38px; height: 38px; background: linear-gradient(135deg,var(--accent),var(--accent2)); border-radius: 9px; display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 16px; font-weight: 700; color: #000; flex-shrink: 0; }
+  .header-text h1 { font-size: 16px; font-weight: 600; }
+  .header-text p { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
+
+  .tab-bar { display: flex; gap: 4px; margin-bottom: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 4px; }
+  .tab-btn { flex: 1; padding: 8px 10px; border: none; border-radius: 7px; cursor: pointer; font-family: var(--sans); font-size: 12px; font-weight: 500; background: transparent; color: var(--muted); transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .tab-btn.active { background: var(--surface2); color: var(--text); }
+  .tab-btn.active.t-macro { color: var(--accent); }
+  .tab-btn.active.t-gemini { color: var(--gemini); }
+  .tab-btn.active.t-ocr { color: #f59e0b; }
+
+  /* OCR Tab */
+  .ocr-header { background: linear-gradient(135deg,rgba(245,158,11,0.12),rgba(239,68,68,0.06)); border: 1px solid rgba(245,158,11,0.3); border-radius: 12px; padding: 14px; margin-bottom: 16px; display: flex; gap: 10px; align-items: flex-start; }
+  .ocr-header h2 { font-size: 14px; font-weight: 600; color: #fcd34d; margin-bottom: 3px; }
+  .ocr-header p { font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+  .api-key-row { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; }
+  .api-key-row input { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 8px 12px; font-size: 12px; font-family: var(--mono); outline: none; transition: border 0.2s; }
+  .api-key-row input:focus { border-color: #f59e0b; }
+  .api-key-row label { font-size: 10px; color: var(--muted); font-family: var(--mono); white-space: nowrap; }
+  .key-save-btn { padding: 7px 14px; background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.4); color: #fcd34d; border-radius: 7px; cursor: pointer; font-size: 11px; font-family: var(--mono); white-space: nowrap; transition: all 0.15s; }
+  .key-save-btn:hover { background: rgba(245,158,11,0.25); }
+  .key-hint { font-size: 10px; color: var(--muted); font-family: var(--mono); margin-bottom: 16px; }
+  .key-hint a { color: #f59e0b; text-decoration: none; }
+
+  .ocr-upload-zone { border: 2px dashed rgba(245,158,11,0.4); border-radius: 12px; padding: 24px 16px; text-align: center; cursor: pointer; transition: all 0.2s; position: relative; margin-bottom: 14px; background: var(--surface); }
+  .ocr-upload-zone:hover,.ocr-upload-zone.dragover { border-color: #f59e0b; background: rgba(245,158,11,0.04); }
+  .ocr-upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .ocr-upload-zone h3 { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .ocr-upload-zone p { font-size: 11px; color: var(--muted); }
+
+  .ocr-queue { margin-bottom: 14px; display: flex; flex-direction: column; gap: 6px; }
+  .ocr-item { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; display: flex; align-items: center; gap: 10px; }
+  .ocr-item-name { flex: 1; font-size: 11px; font-family: var(--mono); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ocr-item-status { font-size: 10px; font-family: var(--mono); padding: 2px 8px; border-radius: 10px; white-space: nowrap; flex-shrink: 0; }
+  .ocr-status-wait { background: rgba(107,122,153,0.15); color: var(--muted); border: 1px solid var(--border); }
+  .ocr-status-proc { background: rgba(245,158,11,0.15); color: #fcd34d; border: 1px solid rgba(245,158,11,0.3); animation: pulse 1s infinite; }
+  .ocr-status-done { background: rgba(0,229,160,0.12); color: var(--accent); border: 1px solid rgba(0,229,160,0.3); }
+  .ocr-status-err { background: rgba(239,68,68,0.12); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+  .ocr-item-del { width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; font-size: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; }
+  .ocr-item-del:hover { border-color: #f87171; color: #f87171; }
+
+  .btn-ocr-run { width: 100%; padding: 12px; background: linear-gradient(135deg,#d97706,#f59e0b); color: #000; font-weight: 700; font-size: 13px; font-family: var(--sans); border: none; border-radius: 10px; cursor: pointer; transition: all 0.2s; margin-bottom: 10px; }
+  .btn-ocr-run:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(245,158,11,0.35); }
+  .btn-ocr-run:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .ocr-result-table { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 14px; }
+  .ocr-result-header { padding: 9px 12px; background: var(--surface2); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .ocr-result-header span { font-family: var(--mono); font-size: 10px; color: #fcd34d; text-transform: uppercase; letter-spacing: 1px; }
+  .ocr-editable { background: var(--surface2); border: 1px solid var(--border); border-radius: 5px; padding: 3px 6px; font-family: var(--mono); font-size: 11px; color: var(--text); width: 100%; outline: none; min-width: 60px; transition: border 0.15s; }
+  .ocr-editable:focus { border-color: var(--accent); }
+  .ocr-editable.yellow { border-color: rgba(245,158,11,0.4); background: rgba(245,158,11,0.06); }
+  .btn-row-del { background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 4px; cursor: pointer; font-size: 10px; padding: 2px 6px; transition: all 0.15s; }
+  .btn-row-del:hover { border-color: #f87171; color: #f87171; }
+  .btn-add-to-macro { width: 100%; padding: 11px; background: transparent; color: var(--accent); font-weight: 600; font-size: 13px; font-family: var(--sans); border: 1px solid var(--accent); border-radius: 10px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 7px; }
+  .btn-add-to-macro:hover { background: rgba(0,229,160,0.08); }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
+  .steps { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; }
+  .step { display: flex; align-items: center; gap: 5px; font-size: 10px; font-family: var(--mono); color: var(--muted); padding: 3px 9px; border: 1px solid var(--border); border-radius: 20px; transition: all 0.2s; }
+  .step.active { color: var(--accent); border-color: var(--accent); background: rgba(0,229,160,0.06); }
+  .step.done { color: var(--accent2); border-color: var(--accent2); background: rgba(0,153,255,0.06); }
+  .step-num { width: 14px; height: 14px; border-radius: 50%; background: var(--border); display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 700; }
+  .step.active .step-num { background: var(--accent); color: #000; }
+  .step.done .step-num { background: var(--accent2); color: #000; }
+
+  .upload-zone { border: 2px dashed var(--border); border-radius: 12px; padding: 30px 18px; text-align: center; cursor: pointer; transition: all 0.2s; position: relative; margin-bottom: 18px; background: var(--surface); }
+  .upload-zone:hover,.upload-zone.dragover { border-color: var(--accent); background: rgba(0,229,160,0.03); }
+  .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .upload-icon { font-size: 28px; margin-bottom: 8px; }
+  .upload-zone h3 { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .upload-zone p { font-size: 11px; color: var(--muted); }
+  .file-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(0,229,160,0.1); border: 1px solid var(--accent); color: var(--accent); padding: 5px 12px; border-radius: 20px; font-size: 11px; font-family: var(--mono); margin-top: 8px; }
+
+  .config-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 18px; }
+  .config-title { font-size: 10px; font-family: var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+  .config-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .config-field { flex: 1; min-width: 110px; }
+  .config-field label { display: block; font-size: 10px; color: var(--muted); margin-bottom: 5px; font-family: var(--mono); }
+  .config-field input { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; color: var(--text); padding: 7px 10px; font-size: 12px; font-family: var(--mono); outline: none; transition: border 0.2s; }
+  .config-field input:focus { border-color: var(--accent); }
+  .range-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+  .range-row label { font-size: 10px; color: var(--muted); font-family: var(--mono); white-space: nowrap; }
+  .range-row input[type=number] { width: 58px; background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; color: var(--text); padding: 6px 8px; font-size: 12px; font-family: var(--mono); outline: none; text-align: center; transition: border 0.2s; }
+  .range-row input:focus { border-color: var(--accent); }
+  .range-hint { font-size: 10px; color: var(--muted); font-family: var(--mono); }
+
+  .preview-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 18px; overflow: hidden; }
+  .preview-header { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .preview-header span { font-size: 10px; font-family: var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .count-badge { background: rgba(0,229,160,0.12); color: var(--accent); border: 1px solid rgba(0,229,160,0.3); border-radius: 20px; padding: 2px 9px; font-size: 10px; font-family: var(--mono); }
+  .table-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th { padding: 7px 10px; text-align: left; font-family: var(--mono); font-size: 9px; font-weight: 600; color: var(--muted); text-transform: uppercase; background: var(--surface2); border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--border); font-family: var(--mono); white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  tr.in-range td { background: rgba(0,229,160,0.04); }
+  tr.in-range td:first-child { border-left: 2px solid var(--accent); }
+  .row-num { color: var(--muted); font-size: 9px; }
+  .amt { color: var(--warn); }
+  .company { color: var(--accent2); }
+
+  .btn-generate { width: 100%; padding: 13px; background: linear-gradient(135deg,var(--accent),#00c87a); color: #000; font-weight: 700; font-size: 14px; font-family: var(--sans); border: none; border-radius: 10px; cursor: pointer; transition: all 0.2s; margin-bottom: 10px; }
+  .btn-generate:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,229,160,0.3); }
+  .btn-generate:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .btn-dl { width: 100%; padding: 11px; background: transparent; color: var(--accent2); font-weight: 600; font-size: 13px; font-family: var(--sans); border: 1px solid var(--accent2); border-radius: 10px; cursor: pointer; transition: all 0.2s; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 7px; }
+  .btn-dl:hover { background: rgba(0,153,255,0.08); }
+
+  .output-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 12px; }
+  .output-header { padding: 9px 12px; background: var(--surface2); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
+  .output-header-left { display: flex; align-items: center; gap: 8px; }
+  .output-header span { font-family: var(--mono); font-size: 11px; color: var(--accent); }
+  .output-stats { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+  .btn-copy-small { padding: 4px 10px; background: rgba(0,229,160,0.12); border: 1px solid rgba(0,229,160,0.4); color: var(--accent); border-radius: 6px; cursor: pointer; font-size: 10px; font-family: var(--mono); transition: all 0.15s; white-space: nowrap; }
+  .btn-copy-small:hover { background: rgba(0,229,160,0.22); }
+  .btn-copy-small.copied { background: rgba(0,229,160,0.3); }
+  .output-pre { padding: 12px; font-family: var(--mono); font-size: 10px; color: #7a9fc0; max-height: 180px; overflow-y: auto; white-space: pre; line-height: 1.6; }
+
+  /* Gemini tab */
+  .gemini-header { background: linear-gradient(135deg,rgba(139,92,246,0.15),rgba(99,102,241,0.08)); border: 1px solid rgba(139,92,246,0.3); border-radius: 12px; padding: 16px; margin-bottom: 18px; display: flex; gap: 12px; align-items: flex-start; }
+  .gemini-icon { font-size: 28px; flex-shrink: 0; }
+  .gemini-header h2 { font-size: 14px; font-weight: 600; color: #c4b5fd; margin-bottom: 4px; }
+  .gemini-header p { font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+  .prompt-section { margin-bottom: 16px; }
+  .prompt-label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .prompt-label span { font-size: 11px; font-family: var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .prompt-box { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; font-family: var(--mono); font-size: 11px; color: var(--text); line-height: 1.7; white-space: pre-wrap; word-break: break-word; max-height: 340px; overflow-y: auto; }
+
+  .step-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 12px; }
+  .step-card-title { font-size: 10px; font-family: var(--mono); color: var(--gemini); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+  .step-card p { font-size: 12px; color: var(--muted); line-height: 1.7; }
+  .step-card code { background: var(--surface2); padding: 1px 5px; border-radius: 4px; font-size: 11px; color: var(--accent); }
+
+  /* eApp steps */
+  .eapp-steps { display: flex; flex-direction: column; gap: 8px; }
+  .eapp-step { display: flex; align-items: flex-start; gap: 10px; }
+  .eapp-num {
+    width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; color: #000; margin-top: 1px;
+  }
+  .eapp-text { font-size: 12px; color: var(--text); line-height: 1.5; }
+  .eapp-text strong { color: var(--accent); font-weight: 600; }
+  .eapp-text .tag {
+    display: inline-block; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 4px; padding: 0px 6px; font-size: 10px; font-family: var(--mono);
+    color: var(--warn); margin-top: 2px;
+  }
+  .eapp-step-last .eapp-num { background: linear-gradient(135deg, #f59e0b, #ef4444); }
+  .eapp-text .tikkok { color: #fe2c55; font-weight: 600; }
+
+  .btn-copy-gemini { padding: 6px 14px; background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.4); color: #c4b5fd; border-radius: 7px; cursor: pointer; font-size: 11px; font-family: var(--mono); transition: all 0.15s; }
+  .btn-copy-gemini:hover { background: rgba(139,92,246,0.25); }
+  .btn-copy-gemini.copied { background: rgba(139,92,246,0.35); }
+
+  .open-gemini-btn { width: 100%; padding: 12px; background: linear-gradient(135deg,#7c3aed,#6366f1); color: white; font-weight: 600; font-size: 13px; font-family: var(--sans); border: none; border-radius: 10px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 4px; }
+  .open-gemini-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(124,58,237,0.4); }
+
+  /* Footer */
+  .gemini-footer { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .footer-powered { font-size: 10px; color: var(--muted); font-family: var(--mono); opacity: 0.5; letter-spacing: 0.5px; }
+  .footer-donation {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(26,158,63,0.08); border: 1px solid rgba(26,158,63,0.25);
+    border-radius: 20px; padding: 6px 16px; cursor: pointer; transition: all 0.2s;
+  }
+  .footer-donation:hover { background: rgba(26,158,63,0.16); border-color: rgba(26,158,63,0.5); }
+  .kbank-dot { width: 8px; height: 8px; border-radius: 50%; background: #1a9e3f; flex-shrink: 0; }
+  .footer-donation-text { font-size: 10px; font-family: var(--mono); color: #4ade80; opacity: 0.8; }
+  .footer-copy-hint { font-size: 9px; color: var(--muted); opacity: 0.4; font-family: var(--mono); }
+
+  .toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--surface2); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 20px; font-family: var(--mono); font-size: 11px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 999; white-space: nowrap; }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">UI</div>
+  <div class="header-text">
+    <h1>eClaims Macro Generator</h1>
+    <p>Receipt OCR → Excel → ui.vision JSON</p>
+  </div>
+</div>
+
+<div class="tab-bar">
+  <button class="tab-btn t-ocr active" onclick="switchTab('ocr')">📸 OCR ใบเสร็จ</button>
+  <button class="tab-btn t-macro" onclick="switchTab('macro')">⚡ ui.vision Macro</button>
+  <button class="tab-btn t-gemini" onclick="switchTab('gemini')">✨ Gemini Prompt</button>
+</div>
+
+<!-- TAB: OCR -->
+<div class="tab-pane active" id="tab-ocr">
+
+  <div class="ocr-header">
+    <div style="font-size:26px;flex-shrink:0">📸</div>
+    <div>
+      <h2>OCR ใบเสร็จด้วย Gemini</h2>
+      <p>อัปโหลดรูปใบเสร็จ → Gemini อ่านข้อมูล → แก้ไข COL7–COL10 → ส่งเข้า Macro tab</p>
+    </div>
+  </div>
+
+  <!-- API Key -->
+  <div class="config-card">
+    <div class="config-title">🔑 Gemini API Key</div>
+    <div class="api-key-row">
+      <input type="password" id="geminiApiKey" placeholder="AIza..." autocomplete="off">
+      <button class="key-save-btn" onclick="saveKey()">💾 Save</button>
+    </div>
+    <div class="key-hint">Key เก็บใน localStorage เครื่องคุณเท่านั้น · <a href="https://aistudio.google.com/apikey" target="_blank">ขอ key ฟรีที่ Google AI Studio ↗</a></div>
+  </div>
+
+  <!-- Upload receipts -->
+  <div class="ocr-upload-zone" id="ocrDropZone">
+    <input type="file" id="ocrFileInput" accept="image/*,.pdf" multiple>
+    <div class="upload-icon">🧾</div>
+    <h3>วางรูปใบเสร็จที่นี่</h3>
+    <p>JPG · PNG · WEBP · หลายไฟล์ได้</p>
+  </div>
+
+  <div class="ocr-queue" id="ocrQueue"></div>
+
+  <button class="btn-ocr-run" id="btnOcrRun" disabled onclick="runOcr()">📸 อ่านใบเสร็จทั้งหมด</button>
+
+  <!-- Result table -->
+  <div id="ocrResultWrap" style="display:none">
+    <div class="ocr-result-table">
+      <div class="ocr-result-header">
+        <span>📋 ผลลัพธ์ OCR</span>
+        <span id="ocrResultCount" style="color:var(--muted);font-family:var(--mono);font-size:10px"></span>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th>วันที่</th><th>เลขใบเสร็จ</th><th>ยอด</th><th>ร้าน/COL1</th>
+            <th>ประเภท<br><span style="font-size:8px;opacity:0.7">COL5</span></th>
+            <th>เขต/อำเภอ<br><span style="font-size:8px;opacity:0.7">COL6</span></th>
+            <th style="color:#fcd34d">Company<br><span style="font-size:8px;opacity:0.7">COL7 *</span></th>
+            <th style="color:#fcd34d">Persons<br><span style="font-size:8px;opacity:0.7">COL8 *</span></th>
+            <th style="color:#fcd34d">N<br><span style="font-size:8px;opacity:0.7">COL9 *</span></th>
+            <th style="color:#fcd34d">Desc<br><span style="font-size:8px;opacity:0.7">COL10 *</span></th>
+            <th></th>
+          </tr></thead>
+          <tbody id="ocrResultBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <p style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-bottom:12px">* <span style="color:#fcd34d">สีเหลือง</span> = กรอกเพิ่มเอง</p>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button class="btn-dl" style="flex:1;margin:0" onclick="downloadOcrExcel()">⬇ Download Excel (.xlsx)</button>
+      <button class="btn-dl" style="flex:1;margin:0;color:var(--accent);border-color:var(--accent)" onclick="downloadOcrCsv()">⬇ Download CSV</button>
+    </div>
+    <button class="btn-add-to-macro" onclick="addToMacroTab()">⚡ ส่งเข้า Macro Tab → Generate JSON</button>
+  </div>
+
+</div>
+
+<!-- TAB: MACRO -->
+<div class="tab-pane" id="tab-macro">
+  <div class="steps">
+    <div class="step active" id="step1"><div class="step-num">1</div> อัพโหลด</div>
+    <div class="step" id="step2"><div class="step-num">2</div> ตั้งค่า</div>
+    <div class="step" id="step3"><div class="step-num">3</div> Generate</div>
+    <div class="step" id="step4"><div class="step-num">4</div> Download</div>
+  </div>
+
+  <div class="upload-zone" id="dropZone">
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+    <div class="upload-icon">📂</div>
+    <h3>วางไฟล์ที่นี่ หรือคลิกเพื่อเลือก</h3>
+    <p>.xlsx / .xls — eClaims format (COL1–COL10)</p>
+    <div id="fileBadge" style="display:none" class="file-badge">✓ <span id="fileName"></span></div>
+  </div>
+
+  <div class="config-card" id="configCard" style="display:none">
+    <div class="config-title">⚙ ตั้งค่า Macro</div>
+    <div class="config-row">
+      <div class="config-field">
+        <label>Macro Name</label>
+        <input type="text" id="macroName" value="eClaims_macro">
+      </div>
+    </div>
+    <div class="range-row">
+      <label>Rows:</label>
+      <input type="number" id="rowFrom" value="1" min="1">
+      <span style="color:var(--muted);font-family:var(--mono);font-size:12px">–</span>
+      <input type="number" id="rowTo" value="999" min="1">
+      <span class="range-hint" id="rangeHint"></span>
+    </div>
+  </div>
+
+  <div class="preview-wrap" id="previewWrap" style="display:none">
+    <div class="preview-header">
+      <span>Preview</span>
+      <span class="count-badge" id="countBadge">0 rows</span>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>#</th><th>วันที่</th><th>เลขที่ใบเสร็จ</th><th>ยอด</th><th>Client</th><th>Persons</th><th>N</th></tr></thead>
+        <tbody id="previewBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <button class="btn-generate" id="btnGenerate" disabled>⚡ Generate ui.vision Macro JSON</button>
+
+  <div id="outputArea" style="display:none">
+    <div class="output-card">
+      <div class="output-header">
+        <div class="output-header-left">
+          <span id="outFileName">macro.json</span>
+          <span class="output-stats" id="outStats"></span>
+        </div>
+        <button class="btn-copy-small" id="btnCopyJson" onclick="copyJson()">📋 Copy JSON</button>
+      </div>
+      <div class="output-pre" id="outputPre"></div>
+    </div>
+    <button class="btn-dl" id="btnDownload">⬇ Download JSON</button>
+  </div>
+</div>
+
+<!-- TAB: GEMINI -->
+<div class="tab-pane" id="tab-gemini">
+
+  <div class="gemini-header">
+    <div class="gemini-icon">✨</div>
+    <div>
+      <h2>สร้างตาราง eClaims ด้วย Gemini</h2>
+      <p>สำหรับคนที่ไม่มี Gems หรือ Claude skill — copy prompt ไปใช้กับ Gemini เพื่อให้ได้ตาราง COL1–COL10 พร้อมกรอก COL7–COL10</p>
+    </div>
+  </div>
+
+  <!-- วิธีใช้ eApplication -->
+  <div class="step-card">
+    <div class="step-card-title">🖥 วิธีใช้ eApplication</div>
+    <div class="eapp-steps">
+      <div class="eapp-step">
+        <div class="eapp-num">1</div>
+        <div class="eapp-text">กด <strong>New eClaim</strong></div>
+      </div>
+      <div class="eapp-step">
+        <div class="eapp-num">2</div>
+        <div class="eapp-text">
+          เลือก Claim Type<br>
+          <span class="tag">Entertainment With Clients or Vendor</span>
+        </div>
+      </div>
+      <div class="eapp-step">
+        <div class="eapp-num">3</div>
+        <div class="eapp-text">
+          Charge To<br>
+          <span class="tag">Own Company</span>
+        </div>
+      </div>
+      <div class="eapp-step eapp-step-last">
+        <div class="eapp-num">4</div>
+        <div class="eapp-text">เปิด <strong>ui.vision</strong> → วาง JSON Script → กด <strong>Play</strong><br>แล้วไปไถ <span class="tikkok">TikTok</span> รอได้เลย 🍿</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gemini prompt how-to -->
+  <div class="step-card">
+    <div class="step-card-title">① วิธีสร้างตารางด้วย Gemini</div>
+    <p>1. Copy prompt ด้านล่าง<br>
+    2. เปิด <strong style="color:#c4b5fd">Gemini</strong> → วาง prompt + แนบรูป/ไฟล์ใบเสร็จ<br>
+    3. Gemini ส่ง output เป็นตาราง COL1–COL10 เว้น COL7–COL10 ว่างไว้<br>
+    4. กรอก COL7–COL10 → save เป็น <code>.xlsx</code><br>
+    5. อัพโหลดใน Tab <code>ui.vision Macro</code> เพื่อ generate JSON</p>
+  </div>
+
+  <div class="prompt-section">
+    <div class="prompt-label">
+      <span>📋 Prompt สำหรับ Gemini</span>
+      <button class="btn-copy-gemini" id="btnCopyPrompt" onclick="copyPrompt()">📋 Copy Prompt</button>
+    </div>
+    <div class="prompt-box" id="geminiPromptBox">อ่านใบเสร็จที่แนบมาทั้งหมด แล้วสร้างตาราง Excel สำหรับ eClaims ให้ฉัน
+
+โดยให้มี 10 คอลัมน์ดังนี้:
+- COL1: ชื่อร้าน/vendor (จากใบเสร็จ)
+- COL2: วันที่ในรูปแบบ DD-Mon-YYYY โดย YYYY คือปี ค.ศ. เท่านั้น (ไม่ใช่ พ.ศ.)
+  เช่น 22-May-2026 ถ้าใบเสร็จระบุ 22/05/2569 ให้แปลงเป็น 22-May-2026
+- COL3: เลขที่ใบเสร็จ หรือ เลขที่ใบกำกับภาษี (จากใบเสร็จ)
+- COL4: จำนวนเงินรวม VAT ทั้งสิ้น (Grand Total / จำนวนเงินรวมทั้งสิ้น)
+  ใช้ตัวเลขทศนิยม 2 ตำแหน่ง ห้ามมี comma เช่น 4360.00 (ไม่ใช่ 4,360.00)
+- COL5: ประเภทรายการ เช่น อาหารและเครื่องดื่ม / ค่าบริการกอล์ฟ / ค่าแคดดี้
+- COL6: ชื่อเขต/อำเภอที่ตั้งร้านเท่านั้น ไม่ต้องใส่จังหวัด (ดูจากที่อยู่ร้านในใบเสร็จ)
+- COL7: Company Name of Client → เว้นว่างไว้
+- COL8: Name & designation of Person(s) → เว้นว่างไว้
+- COL9: Number of Person(s) → เว้นว่างไว้
+- COL10: Description → เว้นว่างไว้
+
+กฎสำคัญ:
+1. ใบเสร็จแต่ละใบ = 1 แถว
+2. ถ้าร้านเดียวกัน วันเดียวกัน มีทั้งใบกำกับภาษี (Tax Invoice) และใบรายการอาหาร
+   (Itemized bill) → นับเป็น 1 แถว ใช้ใบกำกับภาษีเป็น primary เท่านั้น
+3. COL4 ต้องเป็น Grand Total รวม VAT แล้ว ไม่ใช่ยอดก่อน VAT
+4. COL4 ห้ามมี comma ในตัวเลข
+5. COL2 ต้องเป็นปี ค.ศ. เสมอ
+
+แสดงผลเป็น Markdown table พร้อมใช้งาน</div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-card-title">② หลังได้ตารางจาก Gemini</div>
+    <p>กรอก <code>COL7–COL10</code> เพิ่มเติม → save เป็น <code>.xlsx</code> → อัพโหลดใน Tab <strong style="color:var(--accent)">ui.vision Macro</strong> เพื่อ generate JSON ได้เลย</p>
+  </div>
+
+  <button class="open-gemini-btn" onclick="window.open('https://gemini.google.com','_blank')">✨ เปิด Gemini</button>
+
+  <!-- Footer -->
+  <div class="gemini-footer">
+    <div class="footer-powered">Powered by ohmmer</div>
+    <div class="footer-donation" onclick="copyKBank()" title="tap to copy เลขบัญชี">
+      <div class="kbank-dot"></div>
+      <span class="footer-donation-text">KBank · 6712052560 · danupon.k</span>
+      <span class="footer-copy-hint" id="kbankHint">tap to copy</span>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== OCR TAB =====
+let ocrFiles = [];
+let ocrRows = [];
+
+// Load saved key
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = localStorage.getItem('gemini_api_key');
+  if (saved) document.getElementById('geminiApiKey').value = saved;
+});
+
+function saveKey() {
+  const k = document.getElementById('geminiApiKey').value.trim();
+  if (k) { localStorage.setItem('gemini_api_key', k); showToast('✓ บันทึก API Key แล้ว'); }
+}
+
+const ocrDrop = document.getElementById('ocrDropZone');
+const ocrInput = document.getElementById('ocrFileInput');
+ocrDrop.addEventListener('dragover', e => { e.preventDefault(); ocrDrop.classList.add('dragover'); });
+ocrDrop.addEventListener('dragleave', () => ocrDrop.classList.remove('dragover'));
+ocrDrop.addEventListener('drop', e => { e.preventDefault(); ocrDrop.classList.remove('dragover'); addOcrFiles(Array.from(e.dataTransfer.files)); });
+ocrInput.addEventListener('change', e => addOcrFiles(Array.from(e.target.files)));
+
+function addOcrFiles(files) {
+  files.forEach(f => {
+    if (!f.type.startsWith('image/') && f.type !== 'application/pdf') return;
+    ocrFiles.push({ file: f, status: 'wait', id: Date.now() + Math.random() });
+  });
+  renderOcrQueue();
+  document.getElementById('btnOcrRun').disabled = ocrFiles.length === 0;
+}
+
+function renderOcrQueue() {
+  const q = document.getElementById('ocrQueue');
+  q.innerHTML = ocrFiles.map((item, i) => `
+    <div class="ocr-item" id="ocritem-${i}">
+      <span style="font-size:16px">${item.file.type.startsWith('image/') ? '🖼' : '📄'}</span>
+      <span class="ocr-item-name">${item.file.name}</span>
+      <span class="ocr-item-status ocr-status-${item.status}">${{wait:'รอ',proc:'กำลังอ่าน...',done:'✓ สำเร็จ',err:'❌ Error'}[item.status]}</span>
+      ${item.status === 'wait' ? `<button class="ocr-item-del" onclick="removeOcrFile(${i})">✕</button>` : ''}
+    </div>
+  `).join('');
+}
+
+function removeOcrFile(i) {
+  ocrFiles.splice(i, 1);
+  renderOcrQueue();
+  document.getElementById('btnOcrRun').disabled = ocrFiles.length === 0;
+}
+
+async function runOcr() {
+  const apiKey = document.getElementById('geminiApiKey').value.trim();
+  if (!apiKey) { showToast('❌ ใส่ Gemini API Key ก่อน'); return; }
+  document.getElementById('btnOcrRun').disabled = true;
+  ocrRows = [];
+
+  for (let i = 0; i < ocrFiles.length; i++) {
+    ocrFiles[i].status = 'proc';
+    renderOcrQueue();
+    try {
+      const base64 = await fileToBase64(ocrFiles[i].file);
+      const mimeType = ocrFiles[i].file.type || 'image/jpeg';
+      const result = await callGeminiOcr(apiKey, base64, mimeType);
+      // parse JSON from result
+      let parsed = [];
+      try {
+        const clean = result.replace(/```json|```/g, '').trim();
+        parsed = JSON.parse(clean);
+        if (!Array.isArray(parsed)) parsed = [parsed];
+      } catch(e) { parsed = []; }
+      parsed.forEach(r => ocrRows.push(r));
+      ocrFiles[i].status = 'done';
+    } catch(e) {
+      ocrFiles[i].status = 'err';
+      showToast(`❌ ${ocrFiles[i].file.name}: ${e.message}`);
+    }
+    renderOcrQueue();
+  }
+
+  renderOcrResults();
+  document.getElementById('btnOcrRun').disabled = false;
+}
+
+function fileToBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result.split(',')[1]);
+    r.onerror = () => rej(new Error('อ่านไฟล์ไม่ได้'));
+    r.readAsDataURL(file);
+  });
+}
+
+async function callGeminiOcr(apiKey, base64, mimeType) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`;
+  const prompt = `อ่านใบเสร็จนี้แล้วส่งกลับเป็น JSON array เท่านั้น ไม่มีข้อความอื่น
+
+รูปแบบ:
+[{"date":"DD-Mon-YYYY","receipt":"เลขที่ใบเสร็จ","amount":ตัวเลขทศนิยม2ตำแหน่ง,"company":"ชื่อร้าน","col5":"ประเภทรายการ เช่น อาหารและเครื่องดื่ม","col6":"เขต/อำเภอ"}]
+
+กฎ:
+- date: ปี ค.ศ. เสมอ เช่น 22-May-2026
+- amount: Grand Total รวม VAT ทศนิยม 2 ตำแหน่ง ไม่มี comma เช่น 4360.00
+- ถ้ามีทั้ง Tax Invoice และ Itemized bill = 1 แถว ใช้ Tax Invoice
+- ส่งกลับ JSON array เท่านั้น ห้ามมี markdown หรือข้อความอื่น`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [
+        { inline_data: { mime_type: mimeType, data: base64 } },
+        { text: prompt }
+      ]}]
+    })
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error?.message || `HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+}
+
+function renderOcrResults() {
+  if (ocrRows.length === 0) return;
+  document.getElementById('ocrResultWrap').style.display = 'block';
+  document.getElementById('ocrResultCount').textContent = `${ocrRows.length} rows`;
+  const tbody = document.getElementById('ocrResultBody');
+  tbody.innerHTML = ocrRows.map((r, i) => `
+    <tr>
+      <td><input class="ocr-editable" value="${r.date||''}" onchange="ocrRows[${i}].date=this.value"></td>
+      <td><input class="ocr-editable" value="${r.receipt||''}" onchange="ocrRows[${i}].receipt=this.value"></td>
+      <td><input class="ocr-editable" value="${r.amount||''}" onchange="ocrRows[${i}].amount=parseFloat(this.value)||0" style="width:80px"></td>
+      <td><input class="ocr-editable" value="${r.company||''}" onchange="ocrRows[${i}].company=this.value"></td>
+      <td><input class="ocr-editable" value="${r.col5||''}" onchange="ocrRows[${i}].col5=this.value"></td>
+      <td><input class="ocr-editable" value="${r.col6||''}" onchange="ocrRows[${i}].col6=this.value"></td>
+      <td><input class="ocr-editable yellow" value="${r.clientCompany||''}" placeholder="กรอก..." onchange="ocrRows[${i}].clientCompany=this.value"></td>
+      <td><input class="ocr-editable yellow" value="${r.persons||''}" placeholder="ชื่อ/ตำแหน่ง..." onchange="ocrRows[${i}].persons=this.value"></td>
+      <td><input class="ocr-editable yellow" value="${r.numP||''}" placeholder="N" onchange="ocrRows[${i}].numP=this.value" style="width:40px"></td>
+      <td><input class="ocr-editable yellow" value="${r.desc||''}" placeholder="รายละเอียด..." onchange="ocrRows[${i}].desc=this.value"></td>
+      <td><button class="btn-row-del" onclick="removeOcrRow(${i})">✕</button></td>
+    </tr>
+  `).join('');
+  document.getElementById('ocrResultWrap').scrollIntoView({ behavior: 'smooth' });
+  showToast(`✓ OCR สำเร็จ ${ocrRows.length} rows`);
+}
+
+function removeOcrRow(i) {
+  ocrRows.splice(i, 1);
+  renderOcrResults();
+  document.getElementById('ocrResultCount').textContent = `${ocrRows.length} rows`;
+}
+
+function getOcrTableData() {
+  const rows = document.querySelectorAll('#ocrResultBody tr');
+  return Array.from(rows).map((tr, i) => {
+    const inputs = tr.querySelectorAll('input');
+    return {
+      col1: inputs[3]?.value || '',
+      col2: inputs[0]?.value || '',
+      col3: inputs[1]?.value || '',
+      col4: inputs[2]?.value || '',
+      col5: inputs[4]?.value || '',
+      col6: inputs[5]?.value || '',
+      col7: inputs[6]?.value || '',
+      col8: inputs[7]?.value || '',
+      col9: inputs[8]?.value || '',
+      col10: inputs[9]?.value || '',
+    };
+  });
+}
+
+function downloadOcrExcel() {
+  const data = getOcrTableData();
+  const header = ['COL1 (ร้าน)','COL2 (วันที่)','COL3 (เลขใบเสร็จ)','COL4 (ยอด)','COL5 (ประเภท)','COL6 (เขต)','COL7 (Company)','COL8 (Persons)','COL9 (N)','COL10 (Desc)'];
+  const wsData = [header, ...data.map(r => [r.col1, r.col2, r.col3, r.col4, r.col5, r.col6, r.col7, r.col8, r.col9, r.col10])];
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  XLSX.utils.book_append_sheet(wb, ws, 'eClaims');
+  XLSX.writeFile(wb, `eclaims_ocr_${new Date().toISOString().slice(0,10)}.xlsx`);
+  showToast('⬇ Download Excel แล้ว!');
+}
+
+function downloadOcrCsv() {
+  const data = getOcrTableData();
+  const header = 'COL1,COL2,COL3,COL4,COL5,COL6,COL7,COL8,COL9,COL10';
+  const rows = data.map(r => [r.col1,r.col2,r.col3,r.col4,r.col5,r.col6,r.col7,r.col8,r.col9,r.col10].map(v => `"${(v||'').replace(/"/g,'""')}"`).join(','));
+  const csv = [header, ...rows].join('\n');
+  const blob = new Blob(['\uFEFF'+csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `eclaims_ocr_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+  showToast('⬇ Download CSV แล้ว!');
+}
+
+function addToMacroTab() {
+  // merge into allRows
+  ocrRows.forEach(r => {
+    allRows.push({
+      date: r.date || '',
+      receipt: r.receipt || '',
+      amount: parseFloat(r.amount) || 0,
+      company: r.clientCompany || r.company || '',
+      persons: r.persons || '',
+      numP: r.numP || '2',
+      desc: r.desc || (r.col5 || '')
+    });
+  });
+  switchTab('macro');
+  document.getElementById('rowTo').value = allRows.length;
+  document.getElementById('configCard').style.display = 'block';
+  document.getElementById('previewWrap').style.display = 'block';
+  setStep(2); updatePreview();
+  showToast(`✓ เพิ่ม ${ocrRows.length} rows เข้า Macro tab แล้ว`);
+}
+</script>
+
+<script>
+let allRows = [];
+let macroJson = '';
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.querySelector('.tab-btn.t-' + tab).classList.add('active');
+}
+
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
+document.getElementById('rowFrom').addEventListener('input', updatePreview);
+document.getElementById('rowTo').addEventListener('input', updatePreview);
+
+function loadFile(file) {
+  document.getElementById('fileName').textContent = file.name;
+  document.getElementById('fileBadge').style.display = 'inline-flex';
+  document.getElementById('macroName').value = file.name.replace(/\.[^.]+$/, '') + '_macro';
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json(ws, { header: 1 });
+      allRows = [];
+      for (let i = 1; i < raw.length; i++) {
+        const r = raw[i];
+        const date = (r[1] || '').toString().trim();
+        if (!date.match(/\d{2}-[A-Za-z]{3}-\d{4}/)) continue;
+        const receipt = (r[2] || '').toString().trim();
+        const amount = parseFloat((r[3] || '0').toString().replace(/,/g, '')) || 0;
+        const company = (r[6] || '').toString().trim();
+        const persons = (r[7] || '').toString().trim();
+        let numP = ''; try { numP = String(parseInt(r[8])); if (numP === 'NaN') numP = ''; } catch(e) {}
+        const desc = (r[9] || '').toString().trim();
+        if (!date || !receipt) continue;
+        allRows.push({ date, receipt, amount, company, persons, numP, desc });
+      }
+      document.getElementById('rowTo').value = allRows.length;
+      document.getElementById('configCard').style.display = 'block';
+      document.getElementById('previewWrap').style.display = 'block';
+      setStep(2); updatePreview();
+      showToast(`✓ โหลดสำเร็จ — ${allRows.length} rows`);
+    } catch(err) { showToast('❌ อ่านไฟล์ไม่ได้'); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function updatePreview() {
+  const from = Math.max(1, parseInt(document.getElementById('rowFrom').value) || 1);
+  const to = Math.min(allRows.length, parseInt(document.getElementById('rowTo').value) || allRows.length);
+  const selected = allRows.slice(from - 1, to);
+  document.getElementById('rangeHint').textContent = `(${selected.length} rows selected)`;
+  document.getElementById('countBadge').textContent = `${selected.length} rows`;
+  const tbody = document.getElementById('previewBody');
+  tbody.innerHTML = '';
+  allRows.forEach((r, i) => {
+    const inRange = (i >= from - 1 && i < to);
+    const tr = document.createElement('tr');
+    if (inRange) tr.className = 'in-range';
+    tr.innerHTML = `<td class="row-num">${inRange ? '▶' : ''} ${i+1}</td><td>${r.date}</td><td>${r.receipt.substring(0,18)}</td><td class="amt">${r.amount.toLocaleString('th',{minimumFractionDigits:2})}</td><td class="company">${r.company.substring(0,16)}</td><td>${r.persons.substring(0,18)}</td><td>${r.numP}</td>`;
+    tbody.appendChild(tr);
+  });
+  document.getElementById('btnGenerate').disabled = selected.length === 0;
+  if (selected.length > 0) setStep(3);
+}
+
+document.getElementById('btnGenerate').addEventListener('click', () => {
+  const from = Math.max(1, parseInt(document.getElementById('rowFrom').value) || 1);
+  const to = Math.min(allRows.length, parseInt(document.getElementById('rowTo').value) || allRows.length);
+  const name = document.getElementById('macroName').value || 'eClaims_macro';
+  const selected = allRows.slice(from - 1, to);
+  const commands = [];
+  selected.forEach((row, i) => {
+    const seq = from + i;
+    commands.push({ Command: "echo", Target: `--- Row ${seq}: ${row.company} | ${row.receipt} ---`, Value: "" });
+    const js = `ASPx.GetControlCollection().GetByName('ctl00_MainContent_deDate').SetDate(new Date('${row.date}'));`;
+    commands.push({ Command: "executeScript", Target: js, Value: "" });
+    commands.push({ Command: "pause", Target: "1500", Value: "" });
+    const fillField = (id, val) => [
+      { Command: "click", Target: id, Value: "" },
+      { Command: "sendKeys", Target: id, Value: "${KEY_CTRL}a" },
+      { Command: "sendKeys", Target: id, Value: "${KEY_DELETE}" },
+      { Command: "type", Target: id, Value: val },
+    ];
+    commands.push(...fillField("id=ctl00_MainContent_txtDescription_I", row.desc));
+    commands.push(...fillField("id=ctl00_MainContent_txtNameAndDesignationOfPerson_I", row.persons));
+    commands.push(...fillField("id=ctl00_MainContent_txtCompanyNameOfClient_I", row.company));
+    commands.push(...fillField("id=ctl00_MainContent_speNumberOfPerson_I", row.numP));
+    commands.push({ Command: "sendKeys", Target: "id=ctl00_MainContent_speNumberOfPerson_I", Value: "${KEY_TAB}" });
+    commands.push({ Command: "pause", Target: "1500", Value: "" });
+    commands.push(...fillField("id=ctl00_MainContent_speAmountBased_I", row.amount.toString()));
+    commands.push({ Command: "sendKeys", Target: "id=ctl00_MainContent_speAmountBased_I", Value: "${KEY_TAB}" });
+    commands.push({ Command: "pause", Target: "1500", Value: "" });
+    commands.push(...fillField("id=ctl00_MainContent_txtNoReceipt_I", row.receipt));
+    commands.push({ Command: "click", Target: "id=ctl00_MainContent_btnSave", Value: "" });
+    commands.push({ Command: "pause", Target: "3000", Value: "" });
+    commands.push({ Command: "waitForElementPresent", Target: "id=ctl00_MainContent_speAmountBased_I", Value: "10000" });
+    commands.push({ Command: "echo", Target: `✅ Row ${seq} saved: ${row.receipt} | ${row.amount} THB`, Value: "" });
+  });
+  commands.push({ Command: "echo", Target: "=== All done! ===", Value: "" });
+  const macro = { Name: name, CreationDate: new Date().toISOString().slice(0,10), Commands: commands };
+  macroJson = JSON.stringify(macro, null, 2);
+  const blob = new Blob([macroJson], { type: 'application/json' });
+  const outFileName = name + '.json';
+  document.getElementById('outFileName').textContent = outFileName;
+  document.getElementById('outStats').textContent = `${selected.length} rows · ${commands.length} commands`;
+  document.getElementById('outputPre').textContent = macroJson.slice(0, 1400) + (macroJson.length > 1400 ? '\n...' : '');
+  document.getElementById('outputArea').style.display = 'block';
+  document.getElementById('btnDownload').onclick = () => {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = outFileName; a.click();
+    showToast('⬇ ดาวน์โหลดแล้ว!');
+  };
+  setStep(4);
+  showToast(`✓ Generate สำเร็จ — ${commands.length} commands`);
+  document.getElementById('outputArea').scrollIntoView({ behavior: 'smooth' });
+});
+
+function copyJson() {
+  if (!macroJson) return;
+  navigator.clipboard.writeText(macroJson).then(() => {
+    const btn = document.getElementById('btnCopyJson');
+    btn.textContent = '✓ Copied!'; btn.classList.add('copied');
+    showToast('✓ Copy JSON แล้ว!');
+    setTimeout(() => { btn.textContent = '📋 Copy JSON'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+function copyPrompt() {
+  const text = document.getElementById('geminiPromptBox').innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('btnCopyPrompt');
+    btn.textContent = '✓ Copied!'; btn.classList.add('copied');
+    showToast('✓ Copy Prompt แล้ว!');
+    setTimeout(() => { btn.textContent = '📋 Copy Prompt'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+function copyKBank() {
+  navigator.clipboard.writeText('6712052560').then(() => {
+    const hint = document.getElementById('kbankHint');
+    hint.textContent = '✓ copied!';
+    showToast('✓ Copy เลขบัญชี KBank แล้ว!');
+    setTimeout(() => { hint.textContent = 'tap to copy'; }, 2000);
+  });
+}
+
+function setStep(n) {
+  for (let i = 1; i <= 4; i++) {
+    const el = document.getElementById('step' + i);
+    if (!el) continue;
+    el.className = 'step' + (i === n ? ' active' : i < n ? ' done' : '');
+  }
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>
