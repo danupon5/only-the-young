@@ -230,7 +230,7 @@
       <input type="password" id="geminiApiKey" placeholder="AIza..." autocomplete="off">
       <button class="key-save-btn" onclick="saveKey()">💾 Save</button>
     </div>
-    <div class="key-hint">Key เก็บใน localStorage เครื่องคุณเท่านั้น · <a href="https://aistudio.google.com/apikey" target="_blank">ขอ key ฟรีที่ ohmmer or  Google AI Studio ↗</a></div>
+    <div class="key-hint">Key เก็บใน localStorage เครื่องคุณเท่านั้น · <a href="https://aistudio.google.com/apikey" target="_blank">ขอ key ฟรีที่ Google AI Studio ↗</a></div>
   </div>
 
   <!-- Upload receipts -->
@@ -456,9 +456,36 @@ window.addEventListener('DOMContentLoaded', () => {
   if (saved) document.getElementById('geminiApiKey').value = saved;
 });
 
-function saveKey() {
+async function saveKey() {
   const k = document.getElementById('geminiApiKey').value.trim();
-  if (k) { localStorage.setItem('gemini_api_key', k); showToast('✓ บันทึก API Key แล้ว'); }
+  if (!k) { showToast('❌ ใส่ API Key ก่อน'); return; }
+  const btn = document.querySelector('.key-save-btn');
+  btn.textContent = '⏳ กำลังเช็ค...';
+  btn.disabled = true;
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${k}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: 'hi' }] }] })
+    });
+    if (res.ok) {
+      localStorage.setItem('gemini_api_key', k);
+      btn.textContent = '✅ เชื่อมต่อได้!';
+      showToast('✅ API Key ใช้งานได้!');
+      setTimeout(() => { btn.textContent = '💾 Save'; btn.disabled = false; }, 2000);
+    } else {
+      const err = await res.json();
+      const msg = err.error?.message || `HTTP ${res.status}`;
+      btn.textContent = '❌ ไม่ผ่าน';
+      showToast(`❌ ${msg.substring(0, 60)}`);
+      setTimeout(() => { btn.textContent = '💾 Save'; btn.disabled = false; }, 3000);
+    }
+  } catch(e) {
+    btn.textContent = '❌ Error';
+    showToast('❌ เชื่อมต่อไม่ได้ — เช็ค network');
+    setTimeout(() => { btn.textContent = '💾 Save'; btn.disabled = false; }, 3000);
+  }
 }
 
 const ocrDrop = document.getElementById('ocrDropZone');
@@ -542,11 +569,12 @@ async function callGeminiOcr(apiKey, base64, mimeType) {
   const prompt = `อ่านใบเสร็จนี้แล้วส่งกลับเป็น JSON array เท่านั้น ไม่มีข้อความอื่น
 
 รูปแบบ:
-[{"date":"DD-Mon-YYYY","receipt":"เลขที่ใบเสร็จ","amount":ตัวเลขทศนิยม2ตำแหน่ง,"company":"ชื่อร้าน","col5":"ประเภทรายการ เช่น อาหารและเครื่องดื่ม","col6":"เขต/อำเภอ"}]
+[{"date":"DD-Mon-YYYY","receipt":"เลขที่ใบเสร็จ หรือ N/A ถ้าไม่มี","amount":ตัวเลขทศนิยม2ตำแหน่ง,"company":"ชื่อร้าน","col5":"ประเภทรายการ เช่น อาหารและเครื่องดื่ม","col6":"เขต/อำเภอ"}]
 
 กฎ:
 - date: ปี ค.ศ. เสมอ เช่น 22-May-2026
 - amount: Grand Total รวม VAT ทศนิยม 2 ตำแหน่ง ไม่มี comma เช่น 4360.00
+- receipt: ถ้าไม่มีเลขที่ใบเสร็จหรือเลขใบกำกับภาษีในใบเสร็จ ให้ใส่ "N/A"
 - ถ้ามีทั้ง Tax Invoice และ Itemized bill = 1 แถว ใช้ Tax Invoice
 - ส่งกลับ JSON array เท่านั้น ห้ามมี markdown หรือข้อความอื่น`;
 
@@ -576,7 +604,7 @@ function renderOcrResults() {
   tbody.innerHTML = ocrRows.map((r, i) => `
     <tr>
       <td><input class="ocr-editable" value="${r.date||''}" onchange="ocrRows[${i}].date=this.value"></td>
-      <td><input class="ocr-editable" value="${r.receipt||''}" onchange="ocrRows[${i}].receipt=this.value"></td>
+      <td><input class="ocr-editable" value="${r.receipt||'N/A'}" onchange="ocrRows[${i}].receipt=this.value"></td>
       <td><input class="ocr-editable" value="${r.amount||''}" onchange="ocrRows[${i}].amount=parseFloat(this.value)||0" style="width:80px"></td>
       <td><input class="ocr-editable" value="${r.company||''}" onchange="ocrRows[${i}].company=this.value"></td>
       <td><input class="ocr-editable" value="${r.col5||''}" onchange="ocrRows[${i}].col5=this.value"></td>
