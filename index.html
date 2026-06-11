@@ -29,7 +29,27 @@
   .tab-btn.active.t-gemini { color: var(--gemini); }
   .tab-btn.active.t-ocr { color: #f59e0b; }
 
-  /* OCR Tab */
+  /* OCR Split Layout */
+  .ocr-layout { display: flex; flex-direction: column; gap: 18px; }
+  .ocr-left-panel { flex: 1; min-width: 0; }
+  .ocr-right-panel { display: none; flex: 1; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; position: sticky; top: 20px; height: calc(100vh - 40px); min-height: 500px; }
+  .ocr-right-panel.has-files { display: flex; }
+  @media (min-width: 1024px) {
+    .ocr-layout { flex-direction: row; align-items: flex-start; }
+    .ocr-left-panel { flex: 1; }
+    .ocr-right-panel { flex: 1; }
+  }
+  @media (max-width: 1023px) {
+    .ocr-right-panel { height: 50vh; position: relative; top: 0; margin-bottom: 18px; }
+  }
+
+  .preview-header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+  .preview-header-bar h3 { font-size: 13px; font-weight: 600; color: #fcd34d; margin: 0; display: flex; align-items: center; gap: 6px; }
+  .preview-box { flex: 1; border: 1px dashed var(--border); border-radius: 8px; background: var(--surface2); overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; }
+  .preview-box iframe, .preview-box img { width: 100%; height: 100%; object-fit: contain; position: absolute; inset: 0; border: none; }
+  .preview-placeholder { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+
+  /* OCR Tab Details */
   .ocr-header { background: linear-gradient(135deg,rgba(245,158,11,0.12),rgba(239,68,68,0.06)); border: 1px solid rgba(245,158,11,0.3); border-radius: 12px; padding: 14px; margin-bottom: 16px; display: flex; gap: 10px; align-items: flex-start; }
   .ocr-header h2 { font-size: 14px; font-weight: 600; color: #fcd34d; margin-bottom: 3px; }
   .ocr-header p { font-size: 11px; color: var(--muted); line-height: 1.5; }
@@ -50,7 +70,9 @@
   .ocr-upload-zone p { font-size: 11px; color: var(--muted); }
 
   .ocr-queue { margin-bottom: 14px; display: flex; flex-direction: column; gap: 6px; }
-  .ocr-item { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; display: flex; align-items: center; gap: 10px; }
+  .ocr-item { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; display: flex; align-items: center; gap: 10px; cursor: pointer; transition: all 0.15s; }
+  .ocr-item:hover { border-color: var(--accent); }
+  .ocr-item.active-preview { border-color: #fcd34d; background: rgba(245,158,11,0.08); }
   .ocr-item-name { flex: 1; font-size: 11px; font-family: var(--mono); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ocr-item-status { font-size: 10px; font-family: var(--mono); padding: 2px 8px; border-radius: 10px; white-space: nowrap; flex-shrink: 0; }
   .ocr-status-wait { background: rgba(107,122,153,0.15); color: var(--muted); border: 1px solid var(--border); }
@@ -59,7 +81,7 @@
   .ocr-status-err { background: rgba(239,68,68,0.12); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
   .ocr-item-del { width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; font-size: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; }
-  .ocr-item-del:hover { border-color: #f87171; color: #f87171; }
+  .ocr-item-del:hover { border-color: #f87171; color: #f87171; background: rgba(239,68,68,0.1); }
 
   .btn-ocr-run { width: 100%; padding: 12px; background: linear-gradient(135deg,#d97706,#f59e0b); color: #000; font-weight: 700; font-size: 13px; font-family: var(--sans); border: none; border-radius: 10px; cursor: pointer; transition: all 0.2s; margin-bottom: 10px; }
   .btn-ocr-run:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(245,158,11,0.35); }
@@ -213,78 +235,87 @@
   <button class="tab-btn t-gemini" onclick="switchTab('gemini')">✨ Gemini Prompt</button>
 </div>
 
-<!-- TAB: OCR -->
 <div class="tab-pane active" id="tab-ocr">
-
-  <div class="ocr-header">
-    <div style="font-size:26px;flex-shrink:0">📸</div>
-    <div>
-      <h2>OCR ใบเสร็จด้วย Gemini</h2>
-      <p>อัปโหลดรูปใบเสร็จ → Gemini อ่านข้อมูล → แก้ไข COL7–COL10 → ส่งเข้า Macro tab</p>
-    </div>
-  </div>
-
-  <!-- API Key -->
-  <div class="config-card">
-    <div class="config-title">🔑 Gemini API Key</div>
-    <div class="api-key-row">
-      <input type="password" id="geminiApiKey" placeholder="AIza..." autocomplete="off">
-      <button class="key-save-btn" onclick="saveKey()">💾 Save</button>
-    </div>
-    <div class="key-hint">Key เก็บใน localStorage เครื่องคุณเท่านั้น · <a href="https://aistudio.google.com/apikey" target="_blank">ขอ key ฟรีที่ Google AI Studio ↗</a></div>
-  </div>
-
-  <!-- Upload receipts -->
-  <div class="ocr-upload-zone" id="ocrDropZone">
-    <input type="file" id="ocrFileInput" accept="image/*,.pdf" multiple>
-    <div class="upload-icon">🧾</div>
-    <h3>วางรูปใบเสร็จที่นี่</h3>
-    <p>JPG · PNG · WEBP · หลายไฟล์ได้</p>
-  </div>
-
-  <div class="ocr-queue" id="ocrQueue"></div>
-
-  <div id="mergeActions" style="display:none;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-    <button class="btn-dl" style="flex:1;margin:0;color:#f59e0b;border-color:rgba(245,158,11,0.5)" onclick="downloadMergedPdf()">⬇ Download Merged PDF</button>
-    <div style="width:100%;font-size:10px;color:var(--muted);font-family:var(--mono);text-align:center" id="mergeInfo"></div>
-  </div>
-
-  <button class="btn-ocr-run" id="btnOcrRun" disabled onclick="runOcr()">📸 อ่านใบเสร็จทั้งหมด (1 request)</button>
-
-  <!-- Result table -->
-  <div id="ocrResultWrap" style="display:none">
-    <div class="ocr-result-table">
-      <div class="ocr-result-header">
-        <span>📋 ผลลัพธ์ OCR</span>
-        <span id="ocrResultCount" style="color:var(--muted);font-family:var(--mono);font-size:10px"></span>
+  <div class="ocr-layout">
+    
+    <div class="ocr-left-panel">
+      <div class="ocr-header">
+        <div style="font-size:26px;flex-shrink:0">📸</div>
+        <div>
+          <h2>OCR ใบเสร็จด้วย Gemini</h2>
+          <p>อัปโหลดรูปใบเสร็จ → Gemini อ่านข้อมูล → แก้ไข COL7–COL10 → ส่งเข้า Macro tab</p>
+        </div>
       </div>
-      <div class="table-scroll">
-        <table>
-          <thead><tr>
-            <th>วันที่</th><th>เลขใบเสร็จ</th><th>ยอด</th><th>ร้าน/COL1</th>
-            <th>ประเภท<br><span style="font-size:8px;opacity:0.7">COL5</span></th>
-            <th>เขต/อำเภอ<br><span style="font-size:8px;opacity:0.7">COL6</span></th>
-            <th style="color:#fcd34d">Company<br><span style="font-size:8px;opacity:0.7">COL7 *</span></th>
-            <th style="color:#fcd34d">Persons<br><span style="font-size:8px;opacity:0.7">COL8 *</span></th>
-            <th style="color:#fcd34d">N<br><span style="font-size:8px;opacity:0.7">COL9 *</span></th>
-            <th style="color:#fcd34d">Desc<br><span style="font-size:8px;opacity:0.7">COL10 *</span></th>
-            <th></th>
-          </tr></thead>
-          <tbody id="ocrResultBody"></tbody>
-        </table>
+
+      <div class="config-card">
+        <div class="config-title">🔑 Gemini API Key</div>
+        <div class="api-key-row">
+          <input type="password" id="geminiApiKey" placeholder="AIza..." autocomplete="off">
+          <button class="key-save-btn" onclick="saveKey()">💾 Save</button>
+        </div>
+        <div class="key-hint">Key เก็บใน localStorage เครื่องคุณเท่านั้น · <a href="https://aistudio.google.com/apikey" target="_blank">ขอ key ฟรีที่ Google AI Studio ↗</a></div>
+      </div>
+
+      <div class="ocr-upload-zone" id="ocrDropZone">
+        <input type="file" id="ocrFileInput" accept="image/*,.pdf" multiple>
+        <div class="upload-icon">🧾</div>
+        <h3>วางรูปใบเสร็จที่นี่</h3>
+        <p>JPG · PNG · WEBP · หลายไฟล์ได้</p>
+      </div>
+
+      <div class="ocr-queue" id="ocrQueue"></div>
+
+      <div id="mergeActions" style="display:none;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        <button class="btn-dl" style="flex:1;margin:0;color:#f59e0b;border-color:rgba(245,158,11,0.5)" onclick="downloadMergedPdf()">⬇ Download Merged PDF</button>
+        <div style="width:100%;font-size:10px;color:var(--muted);font-family:var(--mono);text-align:center" id="mergeInfo"></div>
+      </div>
+
+      <button class="btn-ocr-run" id="btnOcrRun" disabled onclick="runOcr()">📸 อ่านใบเสร็จทั้งหมด (1 request)</button>
+
+      <div id="ocrResultWrap" style="display:none; margin-top: 24px;">
+        <div class="ocr-result-table">
+          <div class="ocr-result-header">
+            <span>📋 ผลลัพธ์ OCR</span>
+            <span id="ocrResultCount" style="color:var(--muted);font-family:var(--mono);font-size:10px"></span>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead><tr>
+                <th>วันที่</th><th>เลขใบเสร็จ</th><th>ยอด</th><th>ร้าน/COL1</th>
+                <th>ประเภท<br><span style="font-size:8px;opacity:0.7">COL5</span></th>
+                <th>เขต/อำเภอ<br><span style="font-size:8px;opacity:0.7">COL6</span></th>
+                <th style="color:#fcd34d">Company<br><span style="font-size:8px;opacity:0.7">COL7 *</span></th>
+                <th style="color:#fcd34d">Persons<br><span style="font-size:8px;opacity:0.7">COL8 *</span></th>
+                <th style="color:#fcd34d">N<br><span style="font-size:8px;opacity:0.7">COL9 *</span></th>
+                <th style="color:#fcd34d">Desc<br><span style="font-size:8px;opacity:0.7">COL10 *</span></th>
+                <th></th>
+              </tr></thead>
+              <tbody id="ocrResultBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <p style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-bottom:12px">* <span style="color:#fcd34d">สีเหลือง</span> = กรอกเพิ่มเอง</p>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <button class="btn-dl" style="flex:1;margin:0" onclick="downloadOcrExcel()">⬇ Download Excel (.xlsx)</button>
+          <button class="btn-dl" style="flex:1;margin:0;color:var(--accent);border-color:var(--accent)" onclick="downloadOcrCsv()">⬇ Download CSV</button>
+        </div>
+        <button class="btn-add-to-macro" onclick="addToMacroTab()">⚡ ส่งเข้า Macro Tab → Generate JSON</button>
       </div>
     </div>
-    <p style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-bottom:12px">* <span style="color:#fcd34d">สีเหลือง</span> = กรอกเพิ่มเอง</p>
-    <div style="display:flex;gap:8px;margin-bottom:10px">
-      <button class="btn-dl" style="flex:1;margin:0" onclick="downloadOcrExcel()">⬇ Download Excel (.xlsx)</button>
-      <button class="btn-dl" style="flex:1;margin:0;color:var(--accent);border-color:var(--accent)" onclick="downloadOcrCsv()">⬇ Download CSV</button>
-    </div>
-    <button class="btn-add-to-macro" onclick="addToMacroTab()">⚡ ส่งเข้า Macro Tab → Generate JSON</button>
-  </div>
 
+    <div class="ocr-right-panel" id="ocrRightPanel">
+      <div class="preview-header-bar">
+        <h3>👁️ Document Preview</h3>
+        <span style="font-size:10px; color:var(--muted); font-family:var(--mono);">Select file in queue</span>
+      </div>
+      <div class="preview-box" id="previewBox">
+        <span class="preview-placeholder">ยังไม่มีไฟล์ตัวอย่าง</span>
+      </div>
+    </div>
+
+  </div>
 </div>
 
-<!-- TAB: MACRO -->
 <div class="tab-pane" id="tab-macro">
   <div class="steps">
     <div class="step active" id="step1"><div class="step-num">1</div> อัพโหลด</div>
@@ -348,7 +379,6 @@
   </div>
 </div>
 
-<!-- TAB: GEMINI -->
 <div class="tab-pane" id="tab-gemini">
 
   <div class="gemini-header">
@@ -359,7 +389,6 @@
     </div>
   </div>
 
-  <!-- วิธีใช้ eApplication -->
   <div class="step-card">
     <div class="step-card-title">🖥 วิธีใช้ eApplication</div>
     <div class="eapp-steps">
@@ -388,7 +417,6 @@
     </div>
   </div>
 
-  <!-- Gemini prompt how-to -->
   <div class="step-card">
     <div class="step-card-title">① วิธีสร้างตารางด้วย Gemini</div>
     <p>1. Copy prompt ด้านล่าง<br>
@@ -437,7 +465,6 @@
 
   <button class="open-gemini-btn" onclick="window.open('https://gemini.google.com','_blank')">✨ เปิด Gemini</button>
 
-  <!-- Footer -->
   <div class="gemini-footer">
     <div class="footer-powered">Powered by ohmmer</div>
     <div class="footer-donation" onclick="copyKBank()" title="tap to copy เลขบัญชี">
@@ -455,6 +482,7 @@
 // ===== OCR TAB =====
 let ocrFiles = [];
 let ocrRows = [];
+let currentPreviewUrl = null;
 
 // Load saved key
 window.addEventListener('DOMContentLoaded', () => {
@@ -502,6 +530,7 @@ ocrDrop.addEventListener('drop', e => { e.preventDefault(); ocrDrop.classList.re
 ocrInput.addEventListener('change', e => addOcrFiles(Array.from(e.target.files)));
 
 function addOcrFiles(files) {
+  const wasEmpty = ocrFiles.length === 0;
   files.forEach(f => {
     if (!f.type.startsWith('image/') && f.type !== 'application/pdf') return;
     ocrFiles.push({ file: f, status: 'wait', id: Date.now() + Math.random() });
@@ -518,6 +547,40 @@ function addOcrFiles(files) {
     document.getElementById('mergeInfo').textContent = ocrFiles.length > 1
       ? `${ocrFiles.length} ไฟล์ → merge เป็น PDF เดียว → ส่ง Gemini 1 ครั้ง = ประหยัด ${ocrFiles.length - 1} RPD`
       : '';
+  }
+  
+  // Update Right Panel Visibility
+  document.getElementById('ocrRightPanel').classList.toggle('has-files', hasFiles);
+  
+  // Auto Preview the first added file if it was previously empty
+  if (wasEmpty && hasFiles) {
+    viewFile(0);
+  }
+}
+
+// Function to handle viewing a document in the Right Panel
+function viewFile(index) {
+  const item = ocrFiles[index];
+  if (!item) return;
+
+  // Update active state in queue
+  document.querySelectorAll('.ocr-item').forEach((el, i) => {
+    if (i === index) el.classList.add('active-preview');
+    else el.classList.remove('active-preview');
+  });
+
+  // Clean up previous blob URL to prevent memory leaks
+  if (currentPreviewUrl) {
+    URL.revokeObjectURL(currentPreviewUrl);
+  }
+
+  const box = document.getElementById('previewBox');
+  currentPreviewUrl = URL.createObjectURL(item.file);
+
+  if (item.file.type === 'application/pdf') {
+    box.innerHTML = `<iframe src="${currentPreviewUrl}#toolbar=0&view=FitH"></iframe>`;
+  } else {
+    box.innerHTML = `<img src="${currentPreviewUrl}" alt="Preview Image">`;
   }
 }
 
@@ -573,19 +636,32 @@ async function downloadMergedPdf() {
 function renderOcrQueue() {
   const q = document.getElementById('ocrQueue');
   q.innerHTML = ocrFiles.map((item, i) => `
-    <div class="ocr-item" id="ocritem-${i}">
+    <div class="ocr-item" id="ocritem-${i}" onclick="viewFile(${i})">
       <span style="font-size:16px">${item.file.type.startsWith('image/') ? '🖼' : '📄'}</span>
       <span class="ocr-item-name">${item.file.name}</span>
       <span class="ocr-item-status ocr-status-${item.status}">${{wait:'รอ',proc:'⏳ กำลัง merge...',done:'✓ สำเร็จ',err:'❌ Error'}[item.status]}</span>
-      ${item.status === 'wait' ? `<button class="ocr-item-del" onclick="removeOcrFile(${i})">✕</button>` : ''}
+      ${item.status === 'wait' ? `<button class="ocr-item-del" onclick="event.stopPropagation(); removeOcrFile(${i})">✕</button>` : ''}
     </div>
   `).join('');
+  
+  // Re-apply active state if needed
+  if (ocrFiles.length > 0) {
+    // try to keep the first item active visually if we just re-rendered
+    // in a real app you might want to track currentSelectedIndex
+  }
 }
 
 function removeOcrFile(i) {
   ocrFiles.splice(i, 1);
   renderOcrQueue();
   addOcrFiles([]); // refresh button label
+  
+  if (ocrFiles.length === 0) {
+    document.getElementById('ocrRightPanel').classList.remove('has-files');
+    document.getElementById('previewBox').innerHTML = `<span class="preview-placeholder">ยังไม่มีไฟล์ตัวอย่าง</span>`;
+  } else {
+    viewFile(0); // View the new first file
+  }
 }
 
 async function runOcr() {
@@ -601,7 +677,6 @@ async function runOcr() {
       ocrFiles.forEach(f => { f.status = 'proc'; });
       renderOcrQueue();
       const bytes = await buildMergedPdf();
-      // convert Uint8Array to base64 safely
       let binary = '';
       const chunk = 8192;
       for (let i = 0; i < bytes.length; i += chunk) {
@@ -783,158 +858,4 @@ function switchTab(tab) {
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
 dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
-fileInput.addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
-document.getElementById('rowFrom').addEventListener('input', updatePreview);
-document.getElementById('rowTo').addEventListener('input', updatePreview);
-
-function loadFile(file) {
-  document.getElementById('fileName').textContent = file.name;
-  document.getElementById('fileBadge').style.display = 'inline-flex';
-  document.getElementById('macroName').value = file.name.replace(/\.[^.]+$/, '') + '_macro';
-  const reader = new FileReader();
-  reader.onload = e => {
-    try {
-      const wb = XLSX.read(e.target.result, { type: 'array' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const raw = XLSX.utils.sheet_to_json(ws, { header: 1 });
-      allRows = [];
-      for (let i = 1; i < raw.length; i++) {
-        const r = raw[i];
-        const date = (r[1] || '').toString().trim();
-        if (!date.match(/\d{2}-[A-Za-z]{3}-\d{4}/)) continue;
-        const receipt = (r[2] || '').toString().trim();
-        const amount = parseFloat((r[3] || '0').toString().replace(/,/g, '')) || 0;
-        const company = (r[6] || '').toString().trim();
-        const persons = (r[7] || '').toString().trim();
-        let numP = ''; try { numP = String(parseInt(r[8])); if (numP === 'NaN') numP = ''; } catch(e) {}
-        const desc = (r[9] || '').toString().trim();
-        if (!date || !receipt) continue;
-        allRows.push({ date, receipt, amount, company, persons, numP, desc });
-      }
-      document.getElementById('rowTo').value = allRows.length;
-      document.getElementById('configCard').style.display = 'block';
-      document.getElementById('previewWrap').style.display = 'block';
-      setStep(2); updatePreview();
-      showToast(`✓ โหลดสำเร็จ — ${allRows.length} rows`);
-    } catch(err) { showToast('❌ อ่านไฟล์ไม่ได้'); }
-  };
-  reader.readAsArrayBuffer(file);
-}
-
-function updatePreview() {
-  const from = Math.max(1, parseInt(document.getElementById('rowFrom').value) || 1);
-  const to = Math.min(allRows.length, parseInt(document.getElementById('rowTo').value) || allRows.length);
-  const selected = allRows.slice(from - 1, to);
-  document.getElementById('rangeHint').textContent = `(${selected.length} rows selected)`;
-  document.getElementById('countBadge').textContent = `${selected.length} rows`;
-  const tbody = document.getElementById('previewBody');
-  tbody.innerHTML = '';
-  allRows.forEach((r, i) => {
-    const inRange = (i >= from - 1 && i < to);
-    const tr = document.createElement('tr');
-    if (inRange) tr.className = 'in-range';
-    tr.innerHTML = `<td class="row-num">${inRange ? '▶' : ''} ${i+1}</td><td>${r.date}</td><td>${r.receipt.substring(0,18)}</td><td class="amt">${r.amount.toLocaleString('th',{minimumFractionDigits:2})}</td><td class="company">${r.company.substring(0,16)}</td><td>${r.persons.substring(0,18)}</td><td>${r.numP}</td>`;
-    tbody.appendChild(tr);
-  });
-  document.getElementById('btnGenerate').disabled = selected.length === 0;
-  if (selected.length > 0) setStep(3);
-}
-
-document.getElementById('btnGenerate').addEventListener('click', () => {
-  const from = Math.max(1, parseInt(document.getElementById('rowFrom').value) || 1);
-  const to = Math.min(allRows.length, parseInt(document.getElementById('rowTo').value) || allRows.length);
-  const name = document.getElementById('macroName').value || 'eClaims_macro';
-  const selected = allRows.slice(from - 1, to);
-  const commands = [];
-  selected.forEach((row, i) => {
-    const seq = from + i;
-    commands.push({ Command: "echo", Target: `--- Row ${seq}: ${row.company} | ${row.receipt} ---`, Value: "" });
-    const js = `ASPx.GetControlCollection().GetByName('ctl00_MainContent_deDate').SetDate(new Date('${row.date}'));`;
-    commands.push({ Command: "executeScript", Target: js, Value: "" });
-    commands.push({ Command: "pause", Target: "1500", Value: "" });
-    const fillField = (id, val) => [
-      { Command: "click", Target: id, Value: "" },
-      { Command: "sendKeys", Target: id, Value: "${KEY_CTRL}a" },
-      { Command: "sendKeys", Target: id, Value: "${KEY_DELETE}" },
-      { Command: "type", Target: id, Value: val },
-    ];
-    commands.push(...fillField("id=ctl00_MainContent_txtDescription_I", row.desc));
-    commands.push(...fillField("id=ctl00_MainContent_txtNameAndDesignationOfPerson_I", row.persons));
-    commands.push(...fillField("id=ctl00_MainContent_txtCompanyNameOfClient_I", row.company));
-    commands.push(...fillField("id=ctl00_MainContent_speNumberOfPerson_I", row.numP));
-    commands.push({ Command: "sendKeys", Target: "id=ctl00_MainContent_speNumberOfPerson_I", Value: "${KEY_TAB}" });
-    commands.push({ Command: "pause", Target: "1500", Value: "" });
-    commands.push(...fillField("id=ctl00_MainContent_speAmountBased_I", row.amount.toString()));
-    commands.push({ Command: "sendKeys", Target: "id=ctl00_MainContent_speAmountBased_I", Value: "${KEY_TAB}" });
-    commands.push({ Command: "pause", Target: "1500", Value: "" });
-    commands.push(...fillField("id=ctl00_MainContent_txtNoReceipt_I", row.receipt));
-    commands.push({ Command: "click", Target: "id=ctl00_MainContent_btnSave", Value: "" });
-    commands.push({ Command: "pause", Target: "3000", Value: "" });
-    commands.push({ Command: "waitForElementPresent", Target: "id=ctl00_MainContent_speAmountBased_I", Value: "10000" });
-    commands.push({ Command: "echo", Target: `✅ Row ${seq} saved: ${row.receipt} | ${row.amount} THB`, Value: "" });
-  });
-  commands.push({ Command: "echo", Target: "=== All done! ===", Value: "" });
-  const macro = { Name: name, CreationDate: new Date().toISOString().slice(0,10), Commands: commands };
-  macroJson = JSON.stringify(macro, null, 2);
-  const blob = new Blob([macroJson], { type: 'application/json' });
-  const outFileName = name + '.json';
-  document.getElementById('outFileName').textContent = outFileName;
-  document.getElementById('outStats').textContent = `${selected.length} rows · ${commands.length} commands`;
-  document.getElementById('outputPre').textContent = macroJson.slice(0, 1400) + (macroJson.length > 1400 ? '\n...' : '');
-  document.getElementById('outputArea').style.display = 'block';
-  document.getElementById('btnDownload').onclick = () => {
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = outFileName; a.click();
-    showToast('⬇ ดาวน์โหลดแล้ว!');
-  };
-  setStep(4);
-  showToast(`✓ Generate สำเร็จ — ${commands.length} commands`);
-  document.getElementById('outputArea').scrollIntoView({ behavior: 'smooth' });
-});
-
-function copyJson() {
-  if (!macroJson) return;
-  navigator.clipboard.writeText(macroJson).then(() => {
-    const btn = document.getElementById('btnCopyJson');
-    btn.textContent = '✓ Copied!'; btn.classList.add('copied');
-    showToast('✓ Copy JSON แล้ว!');
-    setTimeout(() => { btn.textContent = '📋 Copy JSON'; btn.classList.remove('copied'); }, 2000);
-  });
-}
-
-function copyPrompt() {
-  const text = document.getElementById('geminiPromptBox').innerText;
-  navigator.clipboard.writeText(text).then(() => {
-    const btn = document.getElementById('btnCopyPrompt');
-    btn.textContent = '✓ Copied!'; btn.classList.add('copied');
-    showToast('✓ Copy Prompt แล้ว!');
-    setTimeout(() => { btn.textContent = '📋 Copy Prompt'; btn.classList.remove('copied'); }, 2000);
-  });
-}
-
-function copyKBank() {
-  navigator.clipboard.writeText('6712052560').then(() => {
-    const hint = document.getElementById('kbankHint');
-    hint.textContent = '✓ copied!';
-    showToast('✓ Copy เลขบัญชี KBank แล้ว!');
-    setTimeout(() => { hint.textContent = 'tap to copy'; }, 2000);
-  });
-}
-
-function setStep(n) {
-  for (let i = 1; i <= 4; i++) {
-    const el = document.getElementById('step' + i);
-    if (!el) continue;
-    el.className = 'step' + (i === n ? ' active' : i < n ? ' done' : '');
-  }
-}
-
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
-}
-</script>
-</body>
-</html>
+dropZone.addEventListener('dragleave', () => dropZone.
